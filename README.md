@@ -111,6 +111,7 @@ the KF301 screw terminal (U4).
 │   ├── bom.csv
 │   ├── netlist.tel
 │   ├── component-labels.html
+│   ├── interactive-bom.html   Clickable board-to-BOM viewer (open locally)
 │   └── fab/               Fabrication output (Gerbers, preliminary)
 ├── firmware/
 │   ├── platformio.ini
@@ -168,6 +169,9 @@ cd firmware && pio run
 
 - PCB: JLCPCB, bare boards, tented vias, blue soldermask.
 - Components: LCSC, all part numbers are in [`hardware/bom.csv`](hardware/bom.csv).
+  For assembly, [`hardware/interactive-bom.html`](hardware/interactive-bom.html) is a
+  clickable board-to-BOM viewer. GitHub does not render it inline, so download the
+  raw file and open it in a browser.
 - Tube: J305 GM tube (sourced separately).
 - MCU: Seeed Studio XIAO ESP32-C6.
 
