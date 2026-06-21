@@ -47,6 +47,31 @@ The two design notes explain the reasoning, not just the result:
 ![Top side render](docs/images/top-side.png)
 ![Bottom side render](docs/images/bottom-side.png)
 
+## System overview
+
+Power and signal flow between the functional blocks. The red nodes carry the
+~400 V high-voltage domain. The MCU closes the HV control loop (HV_EN out,
+HV_SENSE back in) and reads decay pulses on GM_CLICK.
+
+```mermaid
+flowchart LR
+    USB["USB-C 5V"] --> DRV["UCC27517<br/>gate driver"]
+    MCU["XIAO ESP32-C6"] -- "HV_EN (PWM)" --> DRV
+    DRV --> FLY["Flyback boost<br/>1N60G + L1"]
+    FLY --> HV(("HV_MAIN<br/>~400 V"))
+    HV --> DIV["HV_SNS<br/>1:401 divider"]
+    DIV -- "HV_SENSE (ADC)" --> MCU
+    HV --> AMP["GM_AMP<br/>anode feed + pulse amp"]
+    TUBE[/"J305 GM tube"/] --- AMP
+    AMP -- "GM_CLICK" --> MCU
+    MCU -- "UI_BUZZER" --> BUZ["Piezo buzzer"]
+    MCU -- "WS_DATA" --> LED["WS2812B LED"] --> STRIP["LED strip"]
+    MCU -. "WiFi / BLE" .-> NET[("Network")]
+
+    classDef hv fill:#c0392b,stroke:#7b241c,color:#fff;
+    class FLY,HV,DIV,AMP hv;
+```
+
 ## Hardware overview
 
 | Block | Function | Key parts |
