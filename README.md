@@ -81,7 +81,8 @@ the KF301 screw terminal (U4).
 │   ├── schematic.pdf
 │   ├── bom.csv
 │   ├── netlist.tel
-│   └── component-labels.html
+│   ├── component-labels.html
+│   └── fab/               Fabrication output (Gerbers, preliminary)
 ├── firmware/
 │   ├── platformio.ini
 │   ├── src/main.cpp       Bring-up and test firmware
