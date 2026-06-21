@@ -3,6 +3,10 @@
 [![Firmware CI](https://github.com/duramson/rad2light/actions/workflows/firmware-ci.yml/badge.svg)](https://github.com/duramson/rad2light/actions/workflows/firmware-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+<p align="center">
+  <img src="docs/images/3d-render.png" alt="Rad2Light board render" width="520">
+</p>
+
 An open-source Geiger counter board built around the Seeed Studio XIAO ESP32-C6,
 with closed-loop high-voltage regulation, a WS2812B status LED that chains into an
 addressable strip, and WiFi/BLE on the MCU. The hardware is a reworked take on the
