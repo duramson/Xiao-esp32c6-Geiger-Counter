@@ -150,6 +150,10 @@ HV_MAIN -> R5 (3.3M) -> R6 (3.3M) -> R7 (3.3M) -> R8 (3.3M) -> HV_SENSE
 
 ## 6. Bring-up and debug
 
+The staged commissioning procedure and the compile-time `BRINGUP_STAGE` gate that
+enforces it are documented in [`bring-up.md`](bring-up.md). The populate order
+below maps onto those stages.
+
 Order:
 
 1. Populate only the XIAO plus C7/C8/C9. Check that 3.3 V and 5 V are clean.

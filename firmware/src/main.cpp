@@ -18,10 +18,37 @@
  *   - HV does not start automatically
  *   - Overvoltage (>460V) triggers an immediate shutdown
  *   - Watchdog: loop stall >500ms kills HV
+ *
+ * Bring-up stage:
+ *   This build is gated by BRINGUP_STAGE (set in platformio.ini, default 1).
+ *   Lower stages physically block the HV path so a half-populated board cannot
+ *   energize 400V by accident. See docs/bring-up.md for the full ladder.
  */
 
 #include <Arduino.h>
 #include <FastLED.h>
+
+// --- Bring-up stage gate ---
+// Set with -DBRINGUP_STAGE=<n> in platformio.ini. Each stage unlocks the next
+// block of hardware once the previous one has passed. See docs/bring-up.md.
+//   1 = rails + UI (LED, buzzer). HV path forced off.
+//   2 = HV open-loop. Manual DUTY only, hard low duty cap, no regulation.
+//   3 = HV closed-loop. Bang-bang regulation, soft start, overvoltage trip.
+//   4 = GM detection. Pulse ISR and per-tick buzzer enabled.
+//   5 = full application (strip, lamp mode, connectivity).
+#define STAGE_RAILS_UI  1
+#define STAGE_HV_OPEN   2
+#define STAGE_HV_CLOSED 3
+#define STAGE_GM        4
+#define STAGE_FULL      5
+
+#ifndef BRINGUP_STAGE
+#define BRINGUP_STAGE STAGE_RAILS_UI
+#endif
+
+#if BRINGUP_STAGE < STAGE_RAILS_UI || BRINGUP_STAGE > STAGE_FULL
+#error "BRINGUP_STAGE must be between 1 (rails+UI) and 5 (full application)"
+#endif
 
 // --- Pin definitions (matches netlist) ---
 #define PIN_HV_SENSE  2  // GPIO2  / A2 / D2  - ADC input
@@ -42,7 +69,15 @@
 #define HV_TARGET_DEFAULT 400.0f // volt, J305 setpoint
 #define HV_HYSTERESIS     8.0f   // +/-2% of 400V
 #define HV_OVERVOLTAGE    460.0f // emergency shutdown
-#define HV_MAX_DUTY       128    // 50% of 255, never more
+
+// HV duty ceiling, gated by the bring-up stage (hard safety cap).
+#if BRINGUP_STAGE >= STAGE_HV_CLOSED
+#define HV_MAX_DUTY 128 // 50% of 255, full closed-loop range
+#elif BRINGUP_STAGE >= STAGE_HV_OPEN
+#define HV_MAX_DUTY 40 // open-loop bench testing only, conservative cap
+#else
+#define HV_MAX_DUTY 0 // HV path forced off below stage 2
+#endif
 
 #define SOFT_START_MS   500 // soft start duration
 #define SOFT_START_STEP 5   // duty increment per step
@@ -244,10 +279,11 @@ void processCommand(String cmd) {
 
     if (cmd == "HELP") {
         Serial.println("=== Rad2Light Bring-Up ===");
+        Serial.printf("Build stage: %d / %d\n", BRINGUP_STAGE, STAGE_FULL);
         Serial.println("STATUS          Show all values");
-        Serial.println("HV ON           Start HV (soft start)");
+        Serial.println("HV ON           Start HV closed-loop (stage >= 3)");
         Serial.println("HV OFF          Stop HV immediately");
-        Serial.println("DUTY <0-50>     Fixed duty % (no regulation)");
+        Serial.println("DUTY <0-50>     Fixed duty %, open-loop (stage >= 2)");
         Serial.println("CLICK           Test buzzer click");
         Serial.println("LED <r> <g> <b> Set onboard LED color");
         Serial.println("STRIP <n>       Set strip length (0=off)");
@@ -258,6 +294,7 @@ void processCommand(String cmd) {
         float hv = readHV();
         int raw = readADCRaw();
         Serial.println("--- STATUS ---");
+        Serial.printf("Stage:  %d / %d (compile-time)\n", BRINGUP_STAGE, STAGE_FULL);
         Serial.printf("HV:     %.1f V (ADC raw: %d)\n", hv, raw);
         Serial.printf("Duty:   %d / %d (%.1f%%)\n", hvDutyCurrent, HV_MAX_DUTY,
                       hvDutyCurrent * 100.0f / 255.0f);
@@ -268,10 +305,15 @@ void processCommand(String cmd) {
         Serial.printf("LEDs:   %d (Onboard + Strip)\n", numLeds);
         Serial.println("--------------");
     } else if (cmd == "HV ON") {
+#if BRINGUP_STAGE >= STAGE_HV_CLOSED
         hvOn();
+#else
+        Serial.println("[STAGE] HV ON (closed-loop) needs BRINGUP_STAGE >= 3");
+#endif
     } else if (cmd == "HV OFF") {
         hvOff();
     } else if (cmd.startsWith("DUTY ")) {
+#if BRINGUP_STAGE >= STAGE_HV_OPEN
         int pct = cmd.substring(5).toInt();
         pct = constrain(pct, 0, 50);
         int duty = map(pct, 0, 100, 0, 255);
@@ -279,7 +321,10 @@ void processCommand(String cmd) {
         hvEnabled = true;
         hvRegulating = true;
         setDuty(duty);
-        Serial.printf("[HV] Manual duty: %d%% (raw %d)\n", pct, duty);
+        Serial.printf("[HV] Manual duty: %d%% (capped at raw %d)\n", pct, hvDutyCurrent);
+#else
+        Serial.println("[STAGE] DUTY (HV open-loop) needs BRINGUP_STAGE >= 2");
+#endif
     } else if (cmd == "CLICK") {
         buzzerClick();
         Serial.println("[BUZZ] Click!");
@@ -318,6 +363,7 @@ void setup() {
     Serial.println();
     Serial.println("==================================");
     Serial.println("   Rad2Light - Bring-Up Firmware");
+    Serial.printf("   Build stage: %d / %d\n", BRINGUP_STAGE, STAGE_FULL);
     Serial.println("   Type HELP for commands");
     Serial.println("==================================");
     Serial.println();
@@ -333,8 +379,10 @@ void setup() {
     ledcAttachPin(PIN_HV_EN, HV_PWM_CHANNEL);
     ledcWrite(HV_PWM_CHANNEL, 0);
 
-    // Geiger ISR
+    // Geiger ISR (only armed once the GM detection stage is reached)
+#if BRINGUP_STAGE >= STAGE_GM
     attachInterrupt(digitalPinToInterrupt(PIN_GM_CLICK), onGeigerClick, RISING);
+#endif
 
     // WS2812B
     FastLED.addLeds<WS2812B, PIN_WS_DATA, GRB>(leds, MAX_LEDS);
@@ -393,7 +441,8 @@ void loop() {
     }
     lastClickProcessed = cps;
 
-    // Per-tick buzzer (check flag from ISR)
+    // Per-tick buzzer (check flag from ISR), only from the GM stage on
+#if BRINGUP_STAGE >= STAGE_GM
     static unsigned long lastBuzzMs = 0;
     noInterrupts();
     bool hasNewClick = (clickCount > 0);
@@ -403,6 +452,7 @@ void loop() {
         buzzerClick();
         lastBuzzMs = now;
     }
+#endif
 
     // CAL mode: continuous readout
     if (calMode && now - lastStatusMs >= 200) {

@@ -37,6 +37,8 @@ The two design notes explain the reasoning, not just the result:
   clearances, guard ring, antenna keepout.
 - [`docs/firmware-notes.md`](docs/firmware-notes.md): full pin mapping, block
   descriptions, and the bring-up procedure.
+- [`docs/bring-up.md`](docs/bring-up.md): the staged commissioning ladder and how
+  the compile-time `BRINGUP_STAGE` gate blocks the HV path on a fresh board.
 
 ![Top side render](docs/images/top-side.png)
 ![Bottom side render](docs/images/bottom-side.png)
@@ -73,6 +75,7 @@ the KF301 screw terminal (U4).
 │   ├── design-decisions.md
 │   ├── pcb-notes.md
 │   ├── firmware-notes.md
+│   ├── bring-up.md
 │   └── images/
 ├── hardware/              Schematic, BOM, netlist, component labels
 │   ├── schematic.pdf
@@ -117,6 +120,8 @@ HELP              list commands
 - Overvoltage above 460 V triggers an immediate shutdown.
 - A software watchdog kills HV if the main loop stalls for more than 500 ms.
 - Soft start ramps the duty cycle over 500 ms.
+- A compile-time `BRINGUP_STAGE` gate blocks the HV path on a half-populated board.
+  See [`docs/bring-up.md`](docs/bring-up.md).
 
 ## Continuous integration
 
