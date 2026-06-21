@@ -1,0 +1,26 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+firmware/.pio/
+
+# Build artifacts
+*.elf
+*.bin
+*.hex
+*.o
+*.map
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# EasyEDA / EDA local exports
+*.lock
+~$*
